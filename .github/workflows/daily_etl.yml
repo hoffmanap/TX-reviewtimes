@@ -43,6 +43,7 @@ jobs:
             git pull --rebase origin main
             git push origin main
           fi
+          
       - name: Commit and Push Updated Data Files
         run: |
           git config --global user.name "github-actions[bot]"
