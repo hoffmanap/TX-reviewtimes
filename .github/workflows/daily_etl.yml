@@ -36,4 +36,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Automated update of permit summary data"
-          file_pattern: "data/texas_permit_summary.csv data/texas_permit_detailed.csv"
+          file_pattern: "data/*.csv"
+          skip_dirty_check: false
