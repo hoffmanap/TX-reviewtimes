@@ -1,4 +1,5 @@
 city,project_type,work_scope,total_permits,avg_review_days,median_review_days
-Austin,Other,Alteration/Renovation,1333,0.0,0.0
-Austin,Other,New Construction,1665,0.0,0.0
-Austin,Other,Other,2002,0.0,0.0
+Austin,Multifamily,Alteration/Renovation,182,0.0,0.0
+Austin,Multifamily,New Construction,272,0.0,0.0
+Austin,Single Family,Alteration/Renovation,3153,0.0,0.0
+Austin,Single Family,New Construction,1393,0.0,0.0
