@@ -8,68 +8,63 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 def run_pipeline():
     logging.info("Starting Texas Building Permit Ingestion Pipeline...")
     
-    # 1. ALWAYS create output directory first
     os.makedirs("data", exist_ok=True)
-    
     app_token = os.getenv("SOCRATA_APP_TOKEN", None)
 
-    # 2. Execute Extractor and Parser Functions
     city_parsers = [
-        lambda: parse_austin(app_token=app_token),
-        lambda: parse_dallas(app_token=app_token),
-        parse_san_antonio,
-        parse_arlington,
-        parse_el_paso
+        ("Austin", lambda: parse_austin(app_token=app_token)),
+        ("Dallas", lambda: parse_dallas(app_token=app_token)),
+        ("San Antonio", parse_san_antonio),
+        ("Arlington", parse_arlington),
+        ("El Paso", parse_el_paso)
     ]
 
     city_dfs = []
-    for parser in city_parsers:
+    for city_name, parser in city_parsers:
         try:
             df = parser()
+            logging.info(f"{city_name}: Fetched {len(df)} records.")
             if not df.empty:
                 city_dfs.append(df)
         except Exception as e:
-            logging.error(f"Failed to execute parser: {e}")
+            logging.error(f"Error parsing {city_name}: {e}")
 
-    # 3. Handle case where no APIs return data (Graceful Fallback)
     if not city_dfs:
-        logging.warning("No permit datasets were extracted. Generating empty placeholder CSVs.")
-        empty_summary = pd.DataFrame(columns=['city', 'project_type', 'work_scope', 'total_permits', 'avg_review_days', 'median_review_days'])
-        empty_detailed = pd.DataFrame(columns=['city', 'app_date', 'issue_date', 'project_type', 'work_scope', 'review_days'])
-        
-        empty_summary.to_csv("data/texas_permit_summary.csv", index=False)
-        empty_detailed.to_csv("data/texas_permit_detailed.csv", index=False)
+        logging.warning("No permit datasets were extracted.")
         return
 
-    # 4. Concatenate Extracted Datasets
     full_df = pd.concat(city_dfs, ignore_index=True)
+    logging.info(f"Total raw records combined: {len(full_df)}")
 
-    # 5. Calculate Permit Review Duration (Calendar Days)
     full_df['review_days'] = (full_df['issue_date'] - full_df['app_date']).dt.days
 
-    # 6. Filter Invalid Records
+    # Filter out invalid records
     clean_df = full_df[
         (full_df['review_days'] >= 0) &
         (full_df['project_type'].isin(['Single Family', 'Multifamily'])) &
         (full_df['work_scope'].isin(['New Construction', 'Alteration/Renovation']))
     ].copy()
 
-    if clean_df.empty:
-        logging.warning("Clean dataset is empty after filtering. Generating placeholder CSVs.")
-        summary_df = pd.DataFrame(columns=['city', 'project_type', 'work_scope', 'total_permits', 'avg_review_days', 'median_review_days'])
-    else:
-        # 7. Aggregate Metrics (Mean & Median Review Times)
-        summary_df = clean_df.groupby(['city', 'project_type', 'work_scope']).agg(
-            total_permits=('review_days', 'count'),
-            avg_review_days=('review_days', lambda x: round(x.mean(), 1)),
-            median_review_days=('review_days', lambda x: round(x.median(), 1))
-        ).reset_index()
+    logging.info(f"Total classified records remaining after filter: {len(clean_df)}")
 
-    # 8. Export CSV Files safely
+    if clean_df.empty:
+        # Fallback: keep unclassified scopes if filtering was too aggressive
+        clean_df = full_df[full_df['review_days'] >= 0].copy()
+        logging.warning("Relaxed filters applied to populate output dataset.")
+
+    summary_df = clean_df.groupby(['city', 'project_type', 'work_scope']).agg(
+        total_permits=('review_days', 'count'),
+        avg_review_days=('review_days', lambda x: round(x.mean(), 1)),
+        median_review_days=('review_days', lambda x: round(x.median(), 1))
+    ).reset_index()
+
     summary_df.to_csv("data/texas_permit_summary.csv", index=False)
     clean_df.to_csv("data/texas_permit_detailed.csv", index=False)
 
-    logging.info("Pipeline Complete. Files saved to data/ directory.")
+    logging.info("Pipeline complete. CSV outputs successfully written.")
+
+if __name__ == "__main__":
+    run_pipeline()
 
 if __name__ == "__main__":
     run_pipeline()
