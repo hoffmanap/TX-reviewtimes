@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetches full history so rebase and push work cleanly
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -35,12 +33,7 @@ jobs:
           python -m src.etl_pipeline
 
       - name: Commit and Push Updated Data Files
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/texas_permit_summary.csv data/texas_permit_detailed.csv
-          if ! git diff --quiet || ! git diff --staged --quiet; then
-            git commit -m "Automated update of permit summary data"
-            git pull --rebase origin main
-            git push origin main
-          fi
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Automated update of permit summary data"
+          file_pattern: "data/texas_permit_summary.csv data/texas_permit_detailed.csv"
