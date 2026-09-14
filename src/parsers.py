@@ -51,8 +51,10 @@ def parse_austin(app_token=None) -> pd.DataFrame:
 
 
 def parse_dallas(app_token=None) -> pd.DataFrame:
-    df = fetch_socrata_permits("data.dallasopendata.com", "y5xm-423z", app_token=app_token, limit=5000)
+    # Changed domain to dallasopendata.com
+    df = fetch_socrata_permits("dallasopendata.com", "y5xm-423z", app_token=app_token, limit=5000)
     if df.empty:
+        logging.warning("Dallas fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
