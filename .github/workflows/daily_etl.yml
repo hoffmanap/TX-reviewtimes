@@ -32,7 +32,7 @@ jobs:
         run: |
           python -m src.etl_pipeline
 
-     - name: Commit and Push Updated Data Files
+      - name: Commit and Push Updated Data Files
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
