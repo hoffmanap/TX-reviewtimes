@@ -32,9 +32,19 @@ jobs:
         run: |
           python -m src.etl_pipeline
 
-      - name: Commit and Push Updated Data Files
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Automated update of permit summary data"
-          file_pattern: "data/*.csv"
-          skip_dirty_check: false
+     - name: Commit and Push Updated Data Files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 1. Add everything that exists, ignoring missing files
+          git add .
+          
+          # 2. Safely check if there are any changes to commit
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            git commit -m "Automated update of permit summary data"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No changes were made to the data files during this run."
+          fi
