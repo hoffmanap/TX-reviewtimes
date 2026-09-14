@@ -1,0 +1,11 @@
+# Python environment & cache
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+ENV/
+
+# Data cache (ignore raw dumps, keep aggregated files)
+data/raw/
+.DS_Store
