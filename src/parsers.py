@@ -4,8 +4,10 @@ from src.extractors import fetch_socrata_permits, fetch_arcgis_permits
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+
 def normalize_text(val):
     return str(val).lower() if pd.notna(val) else ''
+
 
 def parse_austin(app_token=None) -> pd.DataFrame:
     df = fetch_socrata_permits("data.austintexas.gov", "3syk-w9eu", app_token=app_token, limit=5000)
@@ -15,7 +17,6 @@ def parse_austin(app_token=None) -> pd.DataFrame:
     normalized = pd.DataFrame()
     normalized['city'] = ['Austin'] * len(df)
 
-    # Dynamic column resolver for Austin schema
     app_col = next((col for col in ['issue_date', 'applied_date', 'application_date', 'status_date'] if col in df.columns), None)
     issue_col = next((col for col in ['issue_date', 'issued_date'] if col in df.columns), None)
 
@@ -29,14 +30,13 @@ def parse_austin(app_token=None) -> pd.DataFrame:
         text = f"{normalize_text(row.get('work_description'))} {normalize_text(row.get('permit_type_desc'))} {normalize_text(row.get('permit_type'))} {normalize_text(row.get('description'))}"
         if any(k in text for k in ['multi', 'apartment', 'condo', 'apt', 'units', 'commercial']):
             return 'Multifamily'
-        # Broad residential fallback for single family
         return 'Single Family'
 
     def classify_scope(row):
-        text = f"{normalize_text(row.get('work_class'))} {normalize_text(row.get('work_type'))} {normalize_text(row.get('permit_type'))}"
-        if any(k in text for k in ['new', 'addition', 'erect', 'construction', 'building']):
-            return 'New Construction'
-        return 'Alteration/Renovation'
+        text = f"{normalize_text(row.get('work_class'))} {normalize_text(row.get('work_type'))} {normalize_text(row.get('permit_type'))} {normalize_text(row.get('work_description'))}"
+        if any(k in text for k in ['remodel', 'alteration', 'repair', 'renovation', 'tenant', 'interior', 'finish', 'addition']):
+            return 'Alteration/Renovation'
+        return 'New Construction'
 
     normalized['project_type'] = df.apply(classify_type, axis=1)
     normalized['work_scope'] = df.apply(classify_scope, axis=1)
@@ -44,7 +44,6 @@ def parse_austin(app_token=None) -> pd.DataFrame:
 
 
 def parse_dallas(app_token=None) -> pd.DataFrame:
-    # Fixed Domain: www.dallasopendata.com
     df = fetch_socrata_permits("www.dallasopendata.com", "y5xm-423z", app_token=app_token, limit=5000)
     if df.empty:
         return pd.DataFrame()
@@ -67,9 +66,9 @@ def parse_dallas(app_token=None) -> pd.DataFrame:
 
     def classify_scope(row):
         text = f"{normalize_text(row.get('work_type'))} {normalize_text(row.get('permit_type'))}"
-        if any(k in text for k in ['new', 'addition', 'construction']):
-            return 'New Construction'
-        return 'Alteration/Renovation'
+        if any(k in text for k in ['remodel', 'alteration', 'renovation', 'repair']):
+            return 'Alteration/Renovation'
+        return 'New Construction'
 
     normalized['project_type'] = df.apply(classify_type, axis=1)
     normalized['work_scope'] = df.apply(classify_scope, axis=1)
@@ -95,9 +94,9 @@ def parse_san_antonio() -> pd.DataFrame:
 
     def classify_scope(row):
         text = f"{normalize_text(row.get('WORK_CLASS'))} {normalize_text(row.get('PERMIT_TYPE'))}"
-        if any(k in text for k in ['new', 'addition']):
-            return 'New Construction'
-        return 'Alteration/Renovation'
+        if any(k in text for k in ['remodel', 'alteration', 'repair']):
+            return 'Alteration/Renovation'
+        return 'New Construction'
 
     normalized['project_type'] = df.apply(classify_type, axis=1)
     normalized['work_scope'] = df.apply(classify_scope, axis=1)
@@ -123,9 +122,9 @@ def parse_arlington() -> pd.DataFrame:
 
     def classify_scope(row):
         text = f"{normalize_text(row.get('WorkClass'))} {normalize_text(row.get('PermitType'))}"
-        if any(k in text for k in ['new', 'addition']):
-            return 'New Construction'
-        return 'Alteration/Renovation'
+        if any(k in text for k in ['alteration', 'remodel', 'repair']):
+            return 'Alteration/Renovation'
+        return 'New Construction'
 
     normalized['project_type'] = df.apply(classify_type, axis=1)
     normalized['work_scope'] = df.apply(classify_scope, axis=1)
@@ -151,9 +150,9 @@ def parse_el_paso() -> pd.DataFrame:
 
     def classify_scope(row):
         text = f"{normalize_text(row.get('WORK_TYPE'))} {normalize_text(row.get('PERMIT_CLASS'))}"
-        if any(k in text for k in ['new', 'addition']):
-            return 'New Construction'
-        return 'Alteration/Renovation'
+        if any(k in text for k in ['alteration', 'addition', 'repair']):
+            return 'Alteration/Renovation'
+        return 'New Construction'
 
     normalized['project_type'] = df.apply(classify_type, axis=1)
     normalized['work_scope'] = df.apply(classify_scope, axis=1)
