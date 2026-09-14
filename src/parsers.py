@@ -7,10 +7,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def parse_austin(app_token=None) -> pd.DataFrame:
     """Austin - Socrata (Dataset: 3syk-w9eu / 3syk-wavh)"""
-    # Fetch data from Austin Socrata
     df = fetch_socrata_permits("data.austintexas.gov", "3syk-w9eu", app_token=app_token, limit=5000)
     if df.empty:
-        # Fallback to secondary endpoint if primary returns empty
         df = fetch_socrata_permits("data.austintexas.gov", "3syk-wavh", app_token=app_token, limit=5000)
     
     if df.empty:
