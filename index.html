@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Texas Building Permit Review Times Dashboard</title>
+  
+  <!-- Chart.js & PapaParse (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 40px;
+      background-color: #f8f9fa;
+      color: #333;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    h1 {
+      margin-top: 0;
+      color: #1a252c;
+    }
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    select {
+      padding: 8px 12px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .chart-container {
+      position: relative;
+      height: 450px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Texas Building Permit Review Times</h1>
+  <p>Comparative median review times (in calendar days) across Texas municipalities.</p>
+
+  <div class="controls">
+    <label>
+      <strong>Work Scope:</strong>
+      <select id="scopeFilter" onchange="updateChart()">
+        <option value="New Construction">New Construction</option>
+        <option value="Alteration/Renovation">Alteration/Renovation</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="permitChart"></canvas>
+  </div>
+</div>
+
+<script>
+  let rawData = [];
+  let myChart = null;
+
+  // Load aggregated CSV file produced by Python ETL pipeline
+  Papa.parse("data/texas_permit_summary.csv", {
+    download: true,
+    header: true,
+    complete: function(results) {
+      rawData = results.data;
+      renderChart();
+    }
+  });
+
+  function renderChart() {
+    const selectedScope = document.getElementById('scopeFilter').value;
+    
+    // Filter dataset based on UI selection
+    const filtered = rawData.filter(d => d.work_scope === selectedScope);
+    
+    const cities = [...new Set(filtered.map(d => d.city))];
+    
+    // Extract median review days for Single Family vs Multifamily
+    const singleFamilyData = cities.map(city => {
+      const match = filtered.find(d => d.city === city && d.project_type === 'Single Family');
+      return match ? parseFloat(match.median_review_days) : 0;
+    });
+
+    const multiFamilyData = cities.map(city => {
+      const match = filtered.find(d => d.city === city && d.project_type === 'Multifamily');
+      return match ? parseFloat(match.median_review_days) : 0;
+    });
+
+    const ctx = document.getElementById('permitChart').getContext('2d');
+    
+    if (myChart) {
+      myChart.destroy();
+    }
+
+    myChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: cities,
+        datasets: [
+          {
+            label: 'Single Family (Median Days)',
+            data: singleFamilyData,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Multifamily (Median Days)',
+            data: multiFamilyData,
+            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Median Review Time (Days)' }
+          }
+        }
+      }
+    });
+  }
+
+  function updateChart() {
+    renderChart();
+  }
+</script>
+
+</body>
+</html>
