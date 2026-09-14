@@ -1,20 +1,39 @@
 import pandas as pd
+import logging
 from src.extractors import fetch_socrata_permits, fetch_arcgis_permits
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
 def parse_austin(app_token=None) -> pd.DataFrame:
-    """Austin - Socrata (3syk-w9eu)"""
+    """Austin - Socrata (Dataset: 3syk-w9eu / 3syk-wavh)"""
+    # Fetch data from Austin Socrata
     df = fetch_socrata_permits("data.austintexas.gov", "3syk-w9eu", app_token=app_token, limit=5000)
     if df.empty:
+        # Fallback to secondary endpoint if primary returns empty
+        df = fetch_socrata_permits("data.austintexas.gov", "3syk-wavh", app_token=app_token, limit=5000)
+    
+    if df.empty:
+        logging.warning("Austin fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
     normalized['city'] = ['Austin'] * len(df)
-    normalized['app_date'] = pd.to_datetime(df.get('applied_date'), errors='coerce')
-    normalized['issue_date'] = pd.to_datetime(df.get('issue_date'), errors='coerce')
+
+    # Dynamic column mapping to handle API field variations
+    app_col = next((col for col in ['applied_date', 'application_date', 'issue_date'] if col in df.columns), None)
+    issue_col = next((col for col in ['issue_date', 'issued_date'] if col in df.columns), None)
+
+    if not app_col or not issue_col:
+        logging.warning("Austin missing required date columns.")
+        return pd.DataFrame()
+
+    normalized['app_date'] = pd.to_datetime(df[app_col], errors='coerce')
+    normalized['issue_date'] = pd.to_datetime(df[issue_col], errors='coerce')
 
     def classify_type(row):
-        work_desc = str(row.get('work_description', '')).lower()
-        permit_type = str(row.get('permit_type_desc', '')).lower()
+        work_desc = str(row.get('work_description', row.get('description', ''))).lower()
+        permit_type = str(row.get('permit_type_desc', row.get('permit_type', ''))).lower()
         if any(term in work_desc or term in permit_type for term in ['multi', 'apartment', 'condo']):
             return 'Multifamily'
         elif any(term in work_desc or term in permit_type for term in ['single family', 'duplex', 'triplex', 'townhome', 'residential']):
@@ -22,7 +41,7 @@ def parse_austin(app_token=None) -> pd.DataFrame:
         return 'Other'
 
     def classify_scope(row):
-        work_class = str(row.get('work_class', '')).lower()
+        work_class = str(row.get('work_class', row.get('work_type', ''))).lower()
         if 'new' in work_class:
             return 'New Construction'
         elif any(term in work_class for term in ['remodel', 'alteration', 'addition', 'repair']):
@@ -35,15 +54,21 @@ def parse_austin(app_token=None) -> pd.DataFrame:
 
 
 def parse_dallas(app_token=None) -> pd.DataFrame:
-    """Dallas - Socrata (y5xm-423z)"""
+    """Dallas - Socrata (Dataset: y5xm-423z)"""
     df = fetch_socrata_permits("data.dallasopendata.com", "y5xm-423z", app_token=app_token, limit=5000)
     if df.empty:
+        logging.warning("Dallas fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
     normalized['city'] = ['Dallas'] * len(df)
-    normalized['app_date'] = pd.to_datetime(df.get('issued_date'), errors='coerce')
-    normalized['issue_date'] = pd.to_datetime(df.get('issued_date'), errors='coerce')
+    
+    date_col = next((col for col in ['issued_date', 'issue_date', 'file_date'] if col in df.columns), None)
+    if not date_col:
+        return pd.DataFrame()
+
+    normalized['app_date'] = pd.to_datetime(df[date_col], errors='coerce')
+    normalized['issue_date'] = pd.to_datetime(df[date_col], errors='coerce')
 
     def classify_type(row):
         permit_type = str(row.get('permit_type', '')).lower()
@@ -72,6 +97,7 @@ def parse_san_antonio() -> pd.DataFrame:
     url = "https://gis.sanantonio.gov/arcgis/rest/services/DSD/BuildingPermits/FeatureServer/0/query"
     df = fetch_arcgis_permits(url, limit=5000)
     if df.empty:
+        logging.warning("San Antonio fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
@@ -106,6 +132,7 @@ def parse_arlington() -> pd.DataFrame:
     url = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Issued_Permits/FeatureServer/0/query"
     df = fetch_arcgis_permits(url, limit=5000)
     if df.empty:
+        logging.warning("Arlington fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
@@ -139,6 +166,7 @@ def parse_el_paso() -> pd.DataFrame:
     url = "https://gis.elpasotexas.gov/arcgis/rest/services/OpenData/BuildingPermits/FeatureServer/0/query"
     df = fetch_arcgis_permits(url, limit=5000)
     if df.empty:
+        logging.warning("El Paso fetch returned empty dataset.")
         return pd.DataFrame()
 
     normalized = pd.DataFrame()
